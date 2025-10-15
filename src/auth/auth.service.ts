@@ -24,7 +24,20 @@ export class AuthService {
     return safeUser;
   }
 
-  signin(dto: AuthDto) {
-    return 'this is sign in api';
+  async signin(dto: AuthDto) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
+
+    if (!user) throw new Error('User not found');
+
+    const loggedIn = await argon.verify(dto.password, user.hashedPassword);
+
+    if (loggedIn) {
+      const { hashedPassword, ...rest } = user;
+      return rest;
+    }
   }
 }
