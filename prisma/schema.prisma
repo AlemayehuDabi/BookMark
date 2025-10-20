@@ -20,6 +20,8 @@ model User {
   email          String  @unique
   hashedPassword String
 
+  refreshToken String?
+
   bookmarks Bookmark[]
 
   createdAt DateTime @default(now())

@@ -13,6 +13,8 @@ export class AuthService {
     private jwt: JwtService,
     private config: ConfigService,
   ) {}
+
+  // sign up function
   async signup(dto: AuthDto) {
     const hashed = await argon.hash(dto.password);
 
@@ -26,10 +28,7 @@ export class AuthService {
 
       if (!user) throw new Error('User not found');
 
-      // remove hashedPassword safely
-      const { hashedPassword, ...safeUser } = user;
-
-      return safeUser;
+      return await this.sign_jwt(user.id, user.email);
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -40,34 +39,70 @@ export class AuthService {
     }
   }
 
+  // sign in function
   async signin(dto: AuthDto) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        email: dto.email,
-      },
-    });
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          email: dto.email,
+        },
+      });
 
-    if (!user) throw new ForbiddenException('Credentials incorrect');
+      if (!user) throw new ForbiddenException('Credentials incorrect');
 
-    const matched = await argon.verify(user.hashedPassword, dto.password);
+      const matched = await argon.verify(user.hashedPassword, dto.password);
 
-    if (!matched) throw new ForbiddenException('Credentials incorrect');
+      if (!matched) throw new ForbiddenException('Credentials incorrect');
 
-    const { hashedPassword, ...rest } = user;
-    return rest;
+      return await this.sign_jwt(user.id, user.email);
+    } catch (error) {
+      throw error;
+    }
   }
 
-  sign_jwt(userId: number, email: string) {
+  // sign_jwt(access token and refresh token)
+  async sign_jwt(userId: number, email: string) {
     const payload = {
       sub: userId,
       email,
     };
 
-    const token = this.jwt.signAsync(payload, {
-      secret: this.config.get('JWT_SECRET'),
-      expiresIn: '15m', // example: token expires in 15 minutes
+    // token
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwt.signAsync(payload, {
+        secret: this.config.get('JWT_ACCESS_SECRET'),
+        expiresIn: '15m',
+      }),
+      this.jwt.signAsync(payload, {
+        secret: this.config.get('JWT_REFRESH_SECRET'),
+        expiresIn: '7d',
+      }),
+    ]);
+
+    // save refresh token in db
+    await this.prisma.user.update({
+      where: { email },
+      data: { refreshToken: await argon.hash(refreshToken) },
     });
 
-    return token;
+    return { accessToken, refreshToken };
+  }
+
+  // access token based on refresh token
+  async generate_access_token(
+    refreshToken: string,
+    UserId: string,
+    email: string,
+  ) {
+    const payload = {
+      sub: UserId,
+      email,
+    };
+    const accessToken = this.jwt.signAsync(payload, {
+      secret: this.config.get('JWT_ACCESS_SECRET'),
+      expiresIn: '15m',
+    });
+
+    return { accessToken };
   }
 }
