@@ -4,6 +4,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service';
 import * as pactum from 'pactum';
 import { AuthDto } from 'src/auth/dto';
+import passport from 'passport';
 
 describe('App e2e', () => {
   let app: INestApplication;
@@ -36,38 +37,86 @@ describe('App e2e', () => {
 
   // auth
   describe('Auth', () => {
+    // dto
+    const dto: AuthDto = {
+      email: 'alemayehudabi606@gmail.com',
+      password: '1234',
+    };
+
     // sign up
     describe('Signup', () => {
-      it('Should Signup', () => {
-        // dto
-        const dto: AuthDto = {
-          email: 'alemayehudabi606@gmail.com',
-          password: '1234',
-        };
+      // email exception
+      it('should exception for email null', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody({
+            password: dto.password,
+          })
+          .expectStatus(400);
+      });
 
+      // password exception
+      it('should exception for password null', () => {
+        return pactum
+          .spec()
+          .post('/auth/signup')
+          .withBody({
+            email: dto.email,
+          })
+          .expectStatus(400);
+      });
+
+      // email and password exception
+      it('should exception for email and password null', () => {
+        return pactum.spec().post('/auth/signup').expectStatus(400);
+      });
+
+      it('Should Signup', () => {
         return pactum
           .spec()
           .post('/auth/signup')
           .withBody(dto)
-          .expectStatus(201)
-          .inspect();
+          .expectStatus(201);
       });
     });
 
     // sign in
     describe('Signin', () => {
-      it('Should Signin', () => {
-        const dto: AuthDto = {
-          email: 'alemayehudabi606@gmail.com',
-          password: '1234',
-        };
+      // email exception
+      it('should exception for email null', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody({
+            password: dto.password,
+          })
+          .expectStatus(400);
+      });
 
-        pactum
+      // password exception
+      it('should exception for password null', () => {
+        return pactum
+          .spec()
+          .post('/auth/signin')
+          .withBody({
+            email: dto.email,
+          })
+          .expectStatus(400);
+      });
+
+      // email and password exception
+      it('should exception for email and password null', () => {
+        return pactum.spec().post('/auth/signin').expectStatus(400);
+      });
+
+      it('Should Signin', () => {
+        return pactum
           .spec()
           .post('/auth/signin')
           .withBody(dto)
           .expectStatus(200)
-          .inspect();
+          .stores('userAccToken', 'accessToken');
       });
     });
   });
